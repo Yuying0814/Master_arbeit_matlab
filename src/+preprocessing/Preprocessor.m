@@ -126,15 +126,13 @@ classdef Preprocessor < handle
             obj.Pages = pages;
         end
 
-        function [contents,messages,batchLines] = classifyPages(obj,batchClient)
-            arguments
-                obj (1,1) preprocessing.Preprocessor 
-                batchClient (1,1) openai.OpenaiBatch = obj.BatchClient
-            end
+        function [contents,messages,batchLines] = classifyPages(obj)
 
             pages = obj.Pages;
             taskConfig = obj.Config.Openai.Task.classifyPages;
-            inputPath = fullfile(obj.Config.Paths.InputDir,"classification_req.jsonl");
+            st = dbstack;
+            inputName = string(st(1).name)+".jsonl";
+            inputPath = fullfile(obj.Config.Paths.InputDir,inputName);
 
             [pages,contents,messages,batchLines] = preprocessing.classification.runClassification( ...
                 pages, ...
@@ -142,7 +140,7 @@ classdef Preprocessor < handle
                 taskConfig, ...
                 inputPath);
 
-            obj.Pages = pages;
+            obj.Pages = obj.Classifier.run(obj.Pages);
         end
 
         % function [contents,message,batchLines] = verifyRegisterPages(obj,batchClient)

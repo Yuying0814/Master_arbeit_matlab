@@ -20,7 +20,7 @@ classdef OpenaiBatch < handle
             obj.ApiKey = apiKey;
         end
 
-        function [contents,messages,batchLines] = runBatch(obj,id,inputPath,user,opts)
+        function [contents,messages,batchLines,job] = runBatch(obj,id,inputPath,user,opts)
             arguments
                 obj (1,1) openai.OpenaiBatch
                 id (1,:) string
@@ -34,13 +34,39 @@ classdef OpenaiBatch < handle
                 opts.MaxCompletionTokens (1,1) double {mustBeInteger,mustBePositive}
                 opts.Tools
             end
-            
-            nv = {};
-
-            modelName = opts.ModelName;
+        
             checkInterval = opts.CheckInterval;
+            opts = rmfield(opts, "CheckInterval");
+            nv = namedargs2cell(opts);
+        
+            job = obj.submitBatch(id,inputPath,user,nv{:});
 
-            opts = rmfield(opts,["ModelName" "CheckInterval"]);
+            inputFileCleanup = onCleanup(@() obj.deleteUploadedFile(job.InputFileId));
+            job = obj.waitBatch(job,checkInterval);
+            [contents,messages,batchLines] = obj.collectJobOutput(job);
+        end
+
+        function job = submitBatch(obj,id,inputPath,user,opts)
+            arguments
+                obj (1,1) openai.OpenaiBatch
+                id (1,:) string
+                inputPath (1,1) string
+                user (1,:) string
+                
+                opts.Developer (1,1) string
+                opts.ModelName (1,1) string = "gpt-5-mini"
+                opts.ResponseFormat (1,1) {openai.mustBeValidResponseFormat}
+                opts.MaxCompletionTokens (1,1) double {mustBeInteger,mustBePositive}
+                opts.Tools
+            end
+
+            [~, fileName] = fileparts(inputPath);
+            name = string(fileName);
+            job = openai.BatchJob(name,id,inputPath);
+
+            nv = {};
+            modelName = opts.ModelName;
+            opts = rmfield(opts,"ModelName");
             nv = namedargs2cell(opts);
 
             obj.resetJSONLs();
@@ -49,59 +75,81 @@ classdef OpenaiBatch < handle
                 id, ...
                 user, ...
                 nv{:});
-        
             obj.writeBatchReqFile(inputPath);
         
             inputFileId = obj.uploadBatchRequest(inputPath);
-            inputFileCleanup = onCleanup(@() obj.deleteUploadedFile(inputFileId));
-            
             batchId = obj.getBatchId(inputFileId);
 
-            obj.waitCompletion(batchId,checkInterval);
-        
-            outputFileId = obj.getOutputId(batchId);
-            rawOutput = obj.getBatchOutput(outputFileId);
+            job.update(BatchId=batchId,InputFileId=inputFileId,Status="submitted");
+        end
 
+        function job = waitBatch(obj,job,checkInterval)
+            arguments
+                obj (1,1) openai.OpenaiBatch
+                job (1,1) openai.BatchJob
+                checkInterval(1,1) double {mustBePositive,mustBeInteger} = 10
+            end
+        
+            while true
+                batchInfo = obj.getBatchInfo(job.BatchId);
+                job.updateBatchInfo(batchInfo);
+                disp(job);
+        
+                if job.isTerminal()
+                    break
+                end
+        
+                pause(checkInterval);
+            end
+            
+            if ~job.isCompleted()
+                error("OpenaiBatch:BatchFailed", ...
+                    "Batch ended with status: %s", job.Status);
+            end
+        end
+
+        function [contents,messages,batchLines] = collectJobOutput(obj,job)
+            arguments
+                obj (1,1) openai.OpenaiBatch
+                job (1,1) openai.BatchJob
+            end
+
+            if ~job.isCompleted()
+                error("OpenaiBatch:JobNotCompleted", ...
+                    "Batch job is not completed. Current status: %s.", job.Status);
+            end
+            
+            if ~job.hasOutput()
+                error("OpenaiBatch:NoOutputFile", ...
+                    "Batch job has no output file id.");
+            end
+
+            outputFileId = job.OutputFileId;
+            rawOutput = obj.getBatchOutput(outputFileId);
             [contents,messages,batchLines] = obj.parseBatchOutput(rawOutput);
         end
 
-        function Job = submitbatch(obj,id,inputPath,user,opts)
+        function cleanupJob(obj,job)
             arguments
                 obj (1,1) openai.OpenaiBatch
-                id (1,:) string
-                inputPath (1,1) string
-                user (1,:) string
-                
-                opts.CheckInterval (1,1) double = 10
-                opts.Developer (1,1) string
-                opts.ModelName (1,1) string = "gpt-5-mini"
-                opts.ResponseFormat (1,1) {openai.mustBeValidResponseFormat}
-                opts.MaxCompletionTokens (1,1) double {mustBeInteger,mustBePositive}
-                opts.Tools
+                job (1,1) openai.BatchJob
             end
-            nv = {};
 
-            modelName = opts.ModelName;
-            checkInterval = opts.CheckInterval;
-
-            opts = rmfield(opts,["ModelName" "CheckInterval"]);
-            nv = namedargs2cell(opts);
-
-            obj.resetJSONLs();
-            obj.buildBatchJSONL( ...
-                modelName, ...
-                id, ...
-                user, ...
-                nv{:});
-            obj.writeBatchReqFile(inputPath);
-        
-            inputFileId = obj.uploadBatchRequest(inputPath);
-            inputFileCleanup = onCleanup(@() obj.deleteUploadedFile(inputFileId));
-            
-            batchId = obj.getBatchId(inputFileId);
-
+            if strlength(job.InputFileId) > 0
+                obj.deleteUploadedFile(job.InputFileId);
+            end
         end
 
+        function batchStatus = getBatchStatus(obj,batchId)
+            batchInfo = obj.getBatchInfo(batchId);
+
+            if ~isfield(batchInfo, "status")
+                error("OpenaiBatch:InvalidResponse", "Response has no status");
+            end
+            
+            batchStatus = string(batchInfo.status);
+        end
+        
         function buildBatchJSONL(obj,modelName,id,user,opts)
             arguments
                 obj (1,1) openai.OpenaiBatch
@@ -317,43 +365,6 @@ classdef OpenaiBatch < handle
             end
         
             batchInfo = response.Body.Data;
-        end
-
-        function batchInfo = waitCompletion(obj,batchId,checkInterval)
-            arguments
-                obj (1,1) openai.OpenaiBatch
-                batchId (1,1) string
-                checkInterval(1,1) double {mustBePositive}
-            end
-
-            endStatus = ["completed", "failed", "cancelled", "expired"];
-        
-            while true
-                batchInfo = obj.getBatchInfo(batchId);
-                batchStatus = string(batchInfo.status);
-                disp(batchId+": "+batchStatus);
-        
-                if any(batchStatus == endStatus)
-                    break
-                end
-        
-                pause(checkInterval);
-            end
-        
-            if batchStatus ~= "completed"
-                error("OpenaiBatch:BatchFailed", ...
-                    "Batch ended with status: %s", batchStatus);
-            end
-        end
-
-        function batchStatus = getBatchStatus(obj,batchId)
-            batchInfo = obj.getBatchInfo(batchId);
-
-            if ~isfield(batchInfo, "status")
-                error("OpenaiBatch:InvalidResponse", "Response has no status");
-            end
-            
-            batchStatus = string(batchInfo.status);
         end
 
         function outputFileId = getOutputId(obj,batchId)
