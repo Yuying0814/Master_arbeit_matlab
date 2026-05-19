@@ -23,7 +23,6 @@ classdef Preprocessor < handle
 
         BatchClient  openai.OpenaiBatch = openai.OpenaiBatch.empty
         MistralClient preprocessing.mistral.Mistral = preprocessing.mistral.Mistral.empty
-        
     end
 
     properties(Access=private)
@@ -53,8 +52,9 @@ classdef Preprocessor < handle
             obj.classifyPages();
             obj.getRegPageIdx();
 
-            [task1,task2] = obj.verifyRegisterPages();
-            task1 = obj.BatchClient.waitBatch(task1);
+            [sumBatchJob,mapBatchJob] = verifyRegisterPages(obj);
+            sumBatchJob = obj.BatchClient.waitBatch(task1);
+
             content1 = obj.BatchClient.collectJobOutput(task1);
             obj.RegSumPageIdx = content1;
 
@@ -149,47 +149,68 @@ classdef Preprocessor < handle
         end
 
         function [contents,messages,batchLines] = classifyPages(obj)
-            import preprocessing.classification.runClassification
+            arguments
+                obj (1,1) preprocessing.Preprocessor
+            end
+            import preprocessing.classification.PageBatchTask
+            import preprocessing.classification.returnClassification
 
             pages = obj.Pages;
             taskConfig = obj.Config.Openai.Task.classifyPages;
-            funName = obj.getMethodName;
+            funName = obj.getMethodName();
             inputName = funName +".jsonl";
             inputPath = fullfile(obj.Config.Paths.InputDir,inputName);
 
-            [pages,contents,messages,batchLines] = preprocessing.classification.runClassification( ...
+            classification = PageBatchTask( ...
                 pages, ...
-                batchClient, ...
-                taskConfig, ...
-                inputPath);
+                obj.BatchClient, ...
+                inputPath, ...
+                taskConfig);
+
+            classification.run();
+
+            contents = classification.Contents;
+            messages = classification.Messages;
+            batchLines = classification.BatchLines;
+
+            obj.Pages = preprocessing.classification.returnClassification(pages,contents);
 
         end
 
-        function [summaryBatchJob,mapBatchJob] = verifyRegisterPages(obj)
-            summaryBatchJob = obj.verifyRegSumPages();
-            mapBatchJob = obj.verifyRegMapPages();
+        function [regSumBatch,regMapBatch] = verifyRegisterPages(obj)
+            regSumBatch = obj.verifyRegSumPages();
+            regMapBatch = obj.verifyRegMapPages();
         end
 
-        function sumBatchJob = verifyRegSumPages(obj)
+        function regSumBatch = verifyRegSumPages(obj)
+            import preprocessing.classification.PageBatchTask
+            
+            funName = obj.getMethodName();
+            inputName = funName +".jsonl";
+            inputPath = fullfile(obj.Config.Paths.InputDir,inputName);
+            taskConfig = obj.Config.Openai.Task.verifyRegSumPages;
+            
+            regSumCandidates = obj.Pages(obj.RegSumIdxCandidate);
+
+            regSumBatch = PageBatchTask(...
+                regSumCandidates, ...
+                obj.BatchClient, ...
+                inputPath, ...
+                taskConfig);
+            
+            
+            
+        end
+
+        function regMapBatch = verifyRegMapPages(obj)
             import preprocessing.classification.runVerification
             
-            funName = obj.getMethodName;
+            funName = obj.getMethodName();
             inputName = funName +".jsonl";
             inputPath = fullfile(obj.Config.Paths.InputDir,inputName);
             taskConfig = obj.Config.Openai.Task.verifyRegSumPages;
 
-            sumBatchJob = runVerification(obj.Pages,obj.BatchClient,inputPath,taskConfig);
-        end
-
-        function mapBatchJob = verifyRegMapPages(obj)
-            import preprocessing.classification.runVerification
             
-            funName = obj.getMethodName;
-            inputName = funName +".jsonl";
-            inputPath = fullfile(obj.Config.Paths.InputDir,inputName);
-            taskConfig = obj.Config.Openai.Task.verifyRegSumPages;
-
-            mapBatchJob = runVerification(obj.Pages,obj.BatchClient,inputPath,taskConfig);
         end
    
 
