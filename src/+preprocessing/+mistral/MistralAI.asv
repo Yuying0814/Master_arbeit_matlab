@@ -1,0 +1,181 @@
+classdef MistralAI
+    %MISTRALAI Summary of this class goes here
+    %   Detailed explanation goes here
+    
+    properties
+        Model {mustBeTextScalar}
+        UrlExpiry (1,1) double {mustBePositive}
+        TableFormat {mustBeTextScalar} 
+        IncludeImg (1,1) logical 
+    end
+    
+    methods
+        function obj = MistralAI(model,urlExpiry,tableFormat,includeImg)
+            arguments
+                model {mustBeTextScalar} = "mistral-ocr-latest"
+                urlExpiry (1,1) double {mustBePositive} = 24
+                tableFormat {mustBeTextScalar} = "html"
+                includeImg (1,1) logical = true
+            end
+
+            obj.Model = model;
+            obj.UrlExpiry = urlExpiry;
+            obj.TableFormat = tableFormat;
+            obj.IncludeImg = includeImg;
+        end
+        
+        function ocrResult = ocr(obj)
+            arguments
+                pdfPath {mustBeTextScalar}
+                obj (1,1) mistral.MistralAI
+            end
+        
+            import matlab.net.URI
+            import matlab.net.http.RequestMessage
+            import matlab.net.http.RequestMethod
+            import matlab.net.http.HeaderField
+            import matlab.net.http.io.FileProvider
+            import matlab.net.http.io.MultipartFormProvider
+            import matlab.net.http.io.JSONProvider
+            import matlab.net.http.StatusCode
+        
+            config = Config.getInstance();
+            apiKey = config.getKey("mistralAI");
+        
+            %% Upload pdf
+            destination = "https://api.mistral.ai/v1/files";
+            provider = MultipartFormProvider( ...
+                "purpose", "ocr", ...
+                "file", FileProvider(pdfPath));
+        
+            headerAuth = HeaderField("Authorization", "Bearer " + apiKey);
+            upReq = RequestMessage(RequestMethod.POST, headerAuth, provider);
+        
+            try
+                upResponse = upReq.send(URI(destination));
+            catch ME
+                error("ocr:UpRequestFailed", ...
+                    "Failed to send upload request\n%s", ME.message);
+            end
+        
+            if upResponse.StatusCode ~= StatusCode.OK
+                error("ocr:UpHttpError", "Upload http error:%s\n%s", ...
+                    string(upResponse.StatusCode), ...
+                    jsonencode(upResponse.Body.Data));
+            end
+        
+            upResult = upResponse.Body.Data;
+        
+            if ~isfield(upResult, "id")
+                error("ocr:InvalidUpResponse", "InvalidUpResponse");
+            end
+        
+            fileId = string(upResult.id);
+        
+            try
+                %% Get signed URL
+                destination = "https://api.mistral.ai/v1/files" + ...
+                    "/" + fileId + "/url?expiry=" + string(obj.UrlExpiry);
+                headerAcpt = HeaderField("Accept", "application/json");
+                headerAuth = HeaderField("Authorization", "Bearer " + apiKey);
+                urlReq = RequestMessage(RequestMethod.GET, [headerAcpt headerAuth]);
+        
+                try
+                    urlResponse = urlReq.send(URI(destination));
+                catch ME
+                    error("ocr:UrlRequestFailed", ...
+                        "Failed to send getSignedUrl request\n%s", ME.message);
+                end
+        
+                if urlResponse.StatusCode ~= StatusCode.OK
+                    error("ocr:UrlHttpError", "getUrl http error: %s\n%s", ...
+                        string(urlResponse.StatusCode), ...
+                        jsonencode(urlResponse.Body.Data));
+                end
+        
+                urlResult = urlResponse.Body.Data;
+        
+                if ~isfield(urlResult, "url")
+                    error("ocr:InvalidUrlResponse", "InvalidUrlResponse");
+                end
+        
+                signedUrl = string(urlResult.url);
+        
+                %% Get OCR Results
+                destination = "https://api.mistral.ai/v1/ocr";
+                headerCont = HeaderField("Content-Type", "application/json");
+                headerAuth = HeaderField("Authorization", "Bearer " + apiKey);
+        
+                reqBody = struct();
+                reqBody.model = obj.Model;
+                reqBody.document = struct( ...
+                    "type", "document_url", ...
+                    "document_url", signedUrl);
+        
+                reqBody.table_format = obj.TableFormat;
+                reqBody.include_image_base64 = obj.IncludeImg;
+        
+                provider = JSONProvider(reqBody);
+                ocrReq = RequestMessage(RequestMethod.POST, ...
+                    [headerCont headerAuth], provider);
+        
+                try
+                    ocrResponse = ocrReq.send(URI(destination));
+                catch ME
+                    error("ocr:OcrRequestFailed", ...
+                        "Failed to send ocr request\n%s", ME.message);
+                end
+        
+                if ocrResponse.StatusCode ~= StatusCode.OK
+                    error("ocr:OcrHttpError", "ocr http error: %s\n%s", ...
+                        string(ocrResponse.StatusCode), ...
+                        jsonencode(ocrResponse.Body.Data));
+                end
+        
+                ocrResult = ocrResponse.Body.Data;
+        
+            catch ME
+                %% Delete uploaded file from cloud after failure
+                destination = "https://api.mistral.ai/v1/files" + "/" + fileId;
+                headerAuth = HeaderField("Authorization", "Bearer " + apiKey);
+                deleteReq = RequestMessage(RequestMethod.DELETE, headerAuth);
+        
+                try
+                    deleteResponse = deleteReq.send(URI(destination));
+        
+                    if deleteResponse.StatusCode ~= StatusCode.OK
+                        warning("ocr:DeleteHttpError", ...
+                            "delete http error: %s\n%s", ...
+                            string(deleteResponse.StatusCode), ...
+                            jsonencode(deleteResponse.Body.Data));
+                    end
+                catch deleteME
+                    warning("ocr:DeleteRequestFailed", ...
+                        "Failed to send delete cleanup request\n%s", deleteME.message);
+                end
+        
+                rethrow(ME);
+            end
+        
+            %% Delete uploaded file from cloud
+            destination = "https://api.mistral.ai/v1/files" + "/" + fileId;
+            headerAuth = HeaderField("Authorization", "Bearer " + apiKey);
+        
+            deleteReq = RequestMessage(RequestMethod.DELETE, headerAuth);
+        
+            try
+                deleteResponse = deleteReq.send(URI(destination));
+            catch ME
+                error("ocr:DeleteRequestFailed", ...
+                    "Failed to send delete request\n%s", ME.message);
+            end
+        
+            if deleteResponse.StatusCode ~= StatusCode.OK
+                error("ocr:DeleteHttpError", "delete http error: %s\n%s", ...
+                    string(deleteResponse.StatusCode), ...
+                    jsonencode(deleteResponse.Body.Data));
+            end
+        end
+    end
+end
+
