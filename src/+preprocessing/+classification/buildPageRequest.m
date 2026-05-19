@@ -1,6 +1,7 @@
-function userRequest = buildClassificationRequest(pages)
+function userRequest = buildPageRequest(pages,reqName)
     arguments
         pages (1,:) struct
+        reqName (1,1) string
     end
     
     keptFields = ["index", "markdown","tables"];
@@ -12,7 +13,7 @@ function userRequest = buildClassificationRequest(pages)
     userRequest = repmat(struct("id","","userPrompt",""),1,numel(pages));
 
     for i=1:numel(pages)
-        id = sprintf("classificationReq_%d",i);
+        id = sprintf("%s_%d",reqName,i);
         context = struct( ...
         "current_page", pages(i), ...
         "previous_content", preContent);

@@ -59,7 +59,7 @@ classdef OpenaiBatch < handle
                 opts.MaxCompletionTokens (1,1) double {mustBeInteger,mustBePositive}
                 opts.Tools
             end
-
+            
             [~, fileName] = fileparts(inputPath);
             name = string(fileName);
             job = openai.BatchJob(name,id,inputPath);
@@ -68,7 +68,7 @@ classdef OpenaiBatch < handle
             modelName = opts.ModelName;
             opts = rmfield(opts,"ModelName");
             nv = namedargs2cell(opts);
-
+            
             obj.resetJSONLs();
             obj.buildBatchJSONL( ...
                 modelName, ...

@@ -1,16 +1,17 @@
-function [pages,contents,messages,batchLines] = runClassification(pages,batchClient,taskConfig,inputPath,maxRetries)
+function [pages,contents,messages,batchLines] = runClassification(pages,batchClient,inputPath,taskConfig,maxRetries)
     arguments
         pages (1,:) struct
         batchClient (1,1) openai.OpenaiBatch
-        taskConfig (1,1) struct
         inputPath (1,1) string
+        taskConfig (1,1) struct
         maxRetries (1,1) double {mustBeInteger,mustBeNonnegative} = 3
     end
     
-    userReq = preprocessing.classification.buildClassificationRequest(pages);
+    [~,name] = fileparts(inputPath);
+    req = preprocessing.classification.buildClassificationRequest(pages);
     
-    customIds = [userReq.id];
-    userPrompts = [userReq.userPrompt];
+    customIds = [req.id];
+    userPrompts = [req.userPrompt];
     systemPrompt = fileread(taskConfig.PromptPath);    
     maxCompletionTokens = taskConfig.MaxCompletionTokens;
     
