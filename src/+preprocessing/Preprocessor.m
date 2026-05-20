@@ -55,21 +55,21 @@ classdef Preprocessor < handle
             [regSumBatch,regPageBatch] = obj.verifyRegisterPages(); %task1, 2
             regSumBatch.waitBatch();
             regSumBatch.collectBatchOutput();
-            regSumBatch.obj.retryBatch();
+            regSumBatch.retryBatch();
             if ~regSumBatch.hasValidOutput
                 error("Preprocessor:InvalidBatchOutput","Invalid Output from register summary page verification");
             end
-            obj.RegSumPageIdx = preprocessing.page.parseVerificationContent(regSumBatch.Contents,regSumBatch.CustomIds);
+            obj.RegSumPageIdx = preprocessing.page.parseVerificationContent(regSumBatch.Contents,regSumBatch.CustomIds,obj.RegSumIdxCandidate);
             
             obj.extractRegIndex(); % task 3
             
             regPageBatch.waitBatch();
             regPageBatch.collectBatchOutput();
-            regPageBatch.obj.retryBatch();
+            regPageBatch.retryBatch();
             if ~regPageBatch.hasValidOutput
                 error("Preprocessor:InvalidBatchOutput","Invalid Output from register map page verification");
             end
-            obj.RegPageIdx = preprocessing.page.parseVerificationContent(regPageBatch.Contents,regPageBatch.CustomIds);
+            obj.RegPageIdx = preprocessing.page.parseVerificationContent(regPageBatch.Contents,regPageBatch.CustomIds,obj.RegPageIdxCandidate);
             
             obj.refineClassification();
             addDescptBatch = addPageDescription(obj); % taks5
@@ -242,7 +242,7 @@ classdef Preprocessor < handle
             taskPrompt = jsonencode(pages(obj.RegSumPageIdx));
             taskConfig = obj.Config.Openai.Task.extractRegIndex;
             
-            regIdxExtractor = openai.OpenaiTaskAgent(config.getKey("openai"),taskPrompt,taskConfig);
+            regIdxExtractor = openai.OpenaiTaskAgent(obj.Config.getKey("openai"),taskPrompt,taskConfig);
             obj.RegSummary = regIdxExtractor.runTask();
         end
 
@@ -255,7 +255,7 @@ classdef Preprocessor < handle
             taskPrompt = jsonencode(taskPrompt);
             taskConfig = obj.Config.Openai.Task.extractRegMap;
 
-            regMapExtractor = openai.OpenaiTaskAgent(config.getKey("openai"),taskPrompt,taskConfig);
+            regMapExtractor = openai.OpenaiTaskAgent(obj.Config.getKey("openai"),taskPrompt,taskConfig);
             obj.RegMap = regMapExtractor.runTask();
 
         end
