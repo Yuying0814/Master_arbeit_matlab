@@ -52,16 +52,24 @@ classdef Preprocessor < handle
             obj.classifyPages();
             obj.getRegPageIdx();
 
-            [sumBatchJob,mapBatchJob] = verifyRegisterPages(obj);
-            sumBatchJob = obj.BatchClient.waitBatch(task1);
-
-            content1 = obj.BatchClient.collectJobOutput(task1);
-            obj.RegSumPageIdx = content1;
-
+            [regSumBatch,regPageBatch] = verifyRegisterPages(obj);
+            regSumBatch.waitBatch();
+            regSumBatch.collectBatchOutput();
+            regSumBatch.obj.retryBatch();
+            if ~regSumBatch.hasValidOutput
+                error("Preprocessor:InvalidBatchOutput","Invalid Output from register summary page verification");
+            end
+            obj.RegSumPageIdx = preprocessing.classification.parseVerificationContent(regSumBatch.Contents);
+            
             obj.extractRegIdex(); % task 3
-            task2 = obj.BatchClient.waitBatch(task2);
-            content2 = obj.BatchClient.collectJobOutput(task2);
-            obj.RegPageIdx = content2;
+            
+            regPageBatch.waitBatch();
+            regPageBatch.collectBatchOutput();
+            regPageBatch.obj.retryBatch();
+            if ~regPageBatch.hasValidOutput
+                error("Preprocessor:InvalidBatchOutput","Invalid Output from register summary page verification");
+            end
+            obj.RegSumPageIdx = preprocessing.classification.parseVerificationContent(regSumBatch.Contents);
 
             task3 = obj.addAnotation(); % task5
             obj.extractRegMap();% task 4
@@ -177,9 +185,9 @@ classdef Preprocessor < handle
 
         end
 
-        function [regSumBatch,regMapBatch] = verifyRegisterPages(obj)
+        function [regSumBatch,regPageBatch] = verifyRegisterPages(obj)
             regSumBatch = obj.verifyRegSumPages();
-            regMapBatch = obj.verifyRegMapPages();
+            regPageBatch = obj.verifyRegMapPages();
         end
 
         function regSumBatch = verifyRegSumPages(obj)
@@ -197,20 +205,25 @@ classdef Preprocessor < handle
                 obj.BatchClient, ...
                 inputPath, ...
                 taskConfig);
-            
-            
-            
+            regSumBatch.submitBatch();
         end
 
-        function regMapBatch = verifyRegMapPages(obj)
-            import preprocessing.classification.runVerification
+        function regPageBatch = verifyRegMapPages(obj)
+            import preprocessing.classification.PageBatchTask
             
             funName = obj.getMethodName();
             inputName = funName +".jsonl";
             inputPath = fullfile(obj.Config.Paths.InputDir,inputName);
-            taskConfig = obj.Config.Openai.Task.verifyRegSumPages;
-
+            taskConfig = obj.Config.Openai.Task.verifyRegMapPages;
             
+            regPageCandidates = obj.Pages(obj.RegPageIdxCandidate);
+
+            regPageBatch = PageBatchTask(...
+                regPageCandidates, ...
+                obj.BatchClient, ...
+                inputPath, ...
+                taskConfig);
+            regPageBatch.submitBatch();
         end
    
 

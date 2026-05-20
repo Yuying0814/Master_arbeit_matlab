@@ -52,19 +52,27 @@ classdef Preprocessor < handle
             obj.classifyPages();
             obj.getRegPageIdx();
 
-            [sumBatchJob,mapBatchJob] = verifyRegisterPages(obj);
-            sumBatchJob = obj.BatchClient.waitBatch(task1);
-
-            content1 = obj.BatchClient.collectJobOutput(task1);
-            obj.RegSumPageIdx = content1;
-
+            [regSumBatch,regPageBatch] = obj.verifyRegisterPages();
+            regSumBatch.waitBatch();
+            regSumBatch.collectBatchOutput();
+            regSumBatch.obj.retryBatch();
+            if ~regSumBatch.hasValidOutput
+                error("Preprocessor:InvalidBatchOutput","Invalid Output from register summary page verification");
+            end
+            obj.RegSumPageIdx = preprocessing.classification.parseVerificationContent(regSumBatch.Contents);
+            
             obj.extractRegIdex(); % task 3
-            task2 = obj.BatchClient.waitBatch(task2);
-            content2 = obj.BatchClient.collectJobOutput(task2);
-            obj.RegPageIdx = content2;
+            
+            regPageBatch.waitBatch();
+            regPageBatch.collectBatchOutput();
+            regPageBatch.obj.retryBatch();
+            if ~regPageBatch.hasValidOutput
+                error("Preprocessor:InvalidBatchOutput","Invalid Output from register summary page verification");
+            end
+            obj.RegSumPageIdx = preprocessing.classification.parseVerificationContent(regSumBatch.Contents);
 
-            task3 = obj.addAnotation(); % task5
-            obj.extractRegMap();% task 4
+            task5 = obj.addAnotation(); % task5
+            obj.extractRegMap(); % task 4
             task3 = obj.BatchClient.waitBatch(task3);
             content3 = obj.BatchClient.collectJobOutput(task3);
             obj.xxx = content3;

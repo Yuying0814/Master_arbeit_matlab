@@ -5,7 +5,7 @@ classdef PageBatchTask < handle
     properties
         Name (1,1) string = ""
         Status (1,1) string = ""
-        ValidOutput (1,1) logical = false;
+        hasValidOutput (1,1) logical = false;
         BatchJob openai.BatchJob = openai.BatchJob.empty
         Contents (1,:) struct
         Messages (1,:) struct
@@ -109,7 +109,7 @@ classdef PageBatchTask < handle
             contents = obj.Contents;
             if isempty(contents)
                 retryCustomId = obj.CustomIds;
-                obj.ValidOutput = false;
+                obj.hasValidOutput = false;
                 return
             end
             
@@ -117,7 +117,7 @@ classdef PageBatchTask < handle
             notFinishedId = [contents([contents.not_finished]).custom_id];
             retryCustomId = [notFinishedId setdiff(obj.CustomIds,existingId)];
 
-            obj.ValidOutput = isempty(retryCustomId) && (numel(obj.CustomIds) == numel(contents));
+            obj.hasValidOutput = isempty(retryCustomId) && (numel(obj.CustomIds) == numel(contents));
         end
 
         function retryBatch(obj,maxRetries)
@@ -129,7 +129,7 @@ classdef PageBatchTask < handle
             for i=1:maxRetries
                 contents = obj.Contents;
                 retryCustomId = obj.checkCompleteness();
-                if obj.ValidOutput
+                if obj.hasValidOutput
                     return
                 end
         
@@ -181,7 +181,7 @@ classdef PageBatchTask < handle
 
         function reset(obj)
             obj.Status = "created";
-            obj.ValidOutput = false;
+            obj.hasValidOutput = false;
             obj.BatchJob = openai.BatchJob.empty;
             obj.Contents = struct([]);
             obj.Messages = struct([]);
