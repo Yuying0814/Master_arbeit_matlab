@@ -53,6 +53,9 @@ classdef Preprocessor < handle
             obj.getRegPageIdx();
 
             [regSumBatch,regPageBatch] = obj.verifyRegisterPages(); %task1, 2
+            regSumCleanup = onCleanup(@() regSumBatch.cleanUp());
+            regPageCleanup = onCleanup(@() regPageBatch.cleanUp());
+           
             regSumBatch.waitBatch();
             regSumBatch.collectBatchOutput();
             regSumBatch.retryBatch();
@@ -72,7 +75,9 @@ classdef Preprocessor < handle
             obj.RegPageIdx = preprocessing.page.parseVerificationContent(regPageBatch.Contents,regPageBatch.CustomIds,obj.RegPageIdxCandidate);
             
             obj.refineClassification();
-            addDescptBatch = addPageDescription(obj); % taks5
+            
+            addDescptBatch = obj.addPageDescription(); % taks5
+            addDesCleanup = onCleanup(@() addDescptBatch.cleanUp());
             obj.extractRegMap(); % task4
             
             addDescptBatch.waitBatch();
@@ -130,7 +135,7 @@ classdef Preprocessor < handle
         end
 
         function getRegPageIdx(obj)
-            %% Get register-map-page and register-summary page number from toc
+            % Get register-map-page and register-summary page number from toc
             pages = preprocessing.toc.findTocPages(obj.Pages);
             tocIdx = find(arrayfun(@(onePage) onePage.result_toc.is_toc, pages));
             tocEntries = preprocessing.toc.extractTocEntry(pages(tocIdx));
@@ -141,7 +146,7 @@ classdef Preprocessor < handle
             obj.TocEntries = tocEntries;
             obj.TocPageIdx = tocIdx;
             
-            %% Get register-map-page and register-summary page number through whole-text-retrieval
+            % Get register-map-page and register-summary page number through whole-text-retrieval
             pages = preprocessing.retrieval.findRelevantPageRange(pages,"register");
             regPageIdx = find(arrayfun(@(onePage) onePage.result_retrieval.is_reg_map_relevant, pages));
             regSumIdx = find(arrayfun(@(onePage) onePage.result_retrieval.is_reg_sum_relevant, pages));
@@ -149,7 +154,7 @@ classdef Preprocessor < handle
             obj.RegPageIdxFromRetrieval = regPageIdx;
             obj.RegSumIdxFromRetrieval = regSumIdx;
 
-            %% Get register-map-page and register-summary page number from LLM
+            % Get register-map-page and register-summary page number from LLM
             regPageIdx = find(arrayfun(@(onePage) onePage.classification.is_register_map_relevant, pages));
             regSumIdx = find(arrayfun(@(onePage) onePage.classification.is_register_summary_relevant, pages));
 
@@ -239,7 +244,9 @@ classdef Preprocessor < handle
                 "index",    {obj.Pages.index}, ...
                 "markdown", {obj.Pages.markdown}, ...
                 "tables",   {obj.Pages.tables});
-            taskPrompt = jsonencode(pages(obj.RegSumPageIdx));
+
+            taskPrompt = struct("pages", pages(obj.RegSumPageIdx));
+            taskPrompt = jsonencode(taskPrompt);
             taskConfig = obj.Config.Openai.Task.extractRegIndex;
             
             regIdxExtractor = openai.OpenaiTaskAgent(obj.Config.getKey("openai"),taskPrompt,taskConfig);
