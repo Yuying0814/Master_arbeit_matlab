@@ -81,9 +81,10 @@ classdef Preprocessor < handle
             
             obj.refineClassification();
             
-            if istf(obj.Pages)
+            if ~allClassificationFalse(obj.Pages)
                 addDescptBatch = obj.addPageDescription(); % taks5
                 addDesCleanup = onCleanup(@() addDescptBatch.cleanUp());
+
                 obj.extractRegMap(); % task4
             
                 addDescptBatch.waitBatch();
@@ -258,6 +259,7 @@ classdef Preprocessor < handle
         
         function extractRegIndex(obj)
             if isempty(obj.RegSumPageIdx)
+                obj.RegSummary.registers = "No Output "
                 return
             end
 
@@ -275,6 +277,10 @@ classdef Preprocessor < handle
         end
 
         function extractRegMap(obj)
+            if isempty(obj.RegPageIdx)
+                return
+            end
+
             pages = struct( ...
                 "index",    {obj.Pages.index}, ...
                 "markdown", {obj.Pages.markdown}, ...

@@ -84,7 +84,7 @@ classdef Preprocessor < handle
             if ~allClassificationFalse(obj.Pages)
                 addDescptBatch = obj.addPageDescription(); % taks5
                 addDesCleanup = onCleanup(@() addDescptBatch.cleanUp());
-            end
+
                 obj.extractRegMap(); % task4
             
                 addDescptBatch.waitBatch();
@@ -94,6 +94,7 @@ classdef Preprocessor < handle
                     error("Preprocessor:InvalidBatchOutput","Invalid Output from adding page description");
                 end
                 obj.Pages = preprocessing.page.parseDescriptionContent(obj.Pages,addDescptBatch.Contents,addDescptBatch.CustomIds);
+            end
         end
 
         function runOcr(obj,mistral)
@@ -278,12 +279,19 @@ classdef Preprocessor < handle
             if isempty(obj.RegPageIdx)
                 return
             end
-            
+
             pages = struct( ...
                 "index",    {obj.Pages.index}, ...
                 "markdown", {obj.Pages.markdown}, ...
                 "tables",   {obj.Pages.tables});
-            taskPrompt = struct("pages",pages(obj.RegPageIdx),"registers",obj.RegSummary.registers);
+
+            if isempty(obj.RegSummary) || ~isfield(obj.RegSummary, "registers")
+                registers = struct([]);
+            else
+                registers = obj.RegSummary.registers;
+            end
+
+            taskPrompt = struct("pages",pages(obj.RegPageIdx),"registers",registers);
             taskPrompt = jsonencode(taskPrompt);
             taskConfig = obj.Config.Openai.Task.extractRegMap;
 
