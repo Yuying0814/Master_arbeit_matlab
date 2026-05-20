@@ -66,14 +66,14 @@ Output example:
   "registers": [
     {
       "name": "REG1",
-      "adress": "0x00",
+      "address": "0x00",
       "bank": "empty",
       "page": "Page0",
       "source_index": "5"
     },
     {
       "name": "REG2",
-      "adress": "0x01",
+      "address": "0x01",
       "bank": "empty",
       "page": "Page0",
       "source_index": "6,7"
@@ -94,7 +94,7 @@ Output example:
 9. Preserve the register order shown in the provided pages.
 10. If address, bank, or page information is unavailable for a register, output `empty` in the corresponding position.
 11. The source value must be the 'index' value of the input page where the register information is found.
-12. Each output register object must contain the same five fields: 'name', 'adress', 'bank', 'page', and 'source_index'.
+12. Each output register object must contain the same five fields: 'name', 'address', 'bank', 'page', and 'source_index'.
 13. If the same register appears multiple times with the same name, address, bank, and page, output it only once.
 14. When duplicate register entries are merged, merge their source page indexes into one source item, separated by commas without spaces.
 15. Return only a structured JSON object that matches the required response schema. Do not output explanations, Markdown, MATLAB code, bullets, numbering, or extra text.

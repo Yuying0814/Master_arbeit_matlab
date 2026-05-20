@@ -84,6 +84,7 @@ classdef Preprocessor < handle
             if ~allClassificationFalse(obj.Pages)
                 addDescptBatch = obj.addPageDescription(); % taks5
                 addDesCleanup = onCleanup(@() addDescptBatch.cleanUp());
+            end
                 obj.extractRegMap(); % task4
             
                 addDescptBatch.waitBatch();
@@ -93,7 +94,6 @@ classdef Preprocessor < handle
                     error("Preprocessor:InvalidBatchOutput","Invalid Output from adding page description");
                 end
                 obj.Pages = preprocessing.page.parseDescriptionContent(obj.Pages,addDescptBatch.Contents,addDescptBatch.CustomIds);
-            end
         end
 
         function runOcr(obj,mistral)
@@ -275,6 +275,10 @@ classdef Preprocessor < handle
         end
 
         function extractRegMap(obj)
+            if isempty(obj.RegPageIdx)
+                return
+            end
+            
             pages = struct( ...
                 "index",    {obj.Pages.index}, ...
                 "markdown", {obj.Pages.markdown}, ...
