@@ -260,6 +260,10 @@ classdef PageBatchTask < handle
         end
 
         function cleanUp(obj)
+            if isempty(obj)
+                return
+            end
+            
             if isempty(obj.BatchClient) || isempty(obj.BatchJob)
                 return
             end

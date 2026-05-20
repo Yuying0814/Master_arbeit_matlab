@@ -53,39 +53,47 @@ classdef Preprocessor < handle
             obj.getRegPageIdx();
 
             [regSumBatch,regPageBatch] = obj.verifyRegisterPages(); %task1, 2
-            regSumBatch.waitBatch();
-            regSumBatch.collectBatchOutput();
-            regSumBatch.obj.retryBatch();
-            if ~regSumBatch.hasValidOutput
-                error("Preprocessor:InvalidBatchOutput","Invalid Output from register summary page verification");
+            regSumCleanup = onCleanup(@() regSumBatch.cleanUp());
+            regPageCleanup = onCleanup(@() regPageBatch.cleanUp());
+            
+            if ~isempty(regSumBatch)
+                regSumBatch.waitBatch();
+                regSumBatch.collectBatchOutput();
+                regSumBatch.retryBatch();
+
+                if ~regSumBatch.hasValidOutput
+                    error("Preprocessor:InvalidBatchOutput","Invalid Output from register summary page verification");
+                end
+                obj.RegSumPageIdx = preprocessing.page.parseVerificationContent(regSumBatch.Contents,regSumBatch.CustomIds,obj.RegSumIdxCandidate);
             end
-            obj.RegSumPageIdx = preprocessing.page.parseVerificationContent(regSumBatch.Contents,regSumBatch.CustomIds);
             
             obj.extractRegIndex(); % task 3
             
-            regPageBatch.waitBatch();
-            regPageBatch.collectBatchOutput();
-            regPageBatch.obj.retryBatch();
-            if ~regPageBatch.hasValidOutput
-                error("Preprocessor:InvalidBatchOutput","Invalid Output from register map page verification");
+            if ~isempty(regPageBatch)
+                regPageBatch.waitBatch();
+                regPageBatch.collectBatchOutput();
+                regPageBatch.retryBatch();
+                if ~regPageBatch.hasValidOutput
+                    error("Preprocessor:InvalidBatchOutput","Invalid Output from register map page verification");
+                end
+                obj.RegPageIdx = preprocessing.page.parseVerificationContent(regPageBatch.Contents,regPageBatch.CustomIds,obj.RegPageIdxCandidate);
             end
-            obj.RegPageIdx = preprocessing.page.parseVerificationContent(regPageBatch.Contents,regPageBatch.CustomIds);
             
             obj.refineClassification();
-            addDescptBatch = addPageDescription(obj); % taks5
-            obj.extractRegMap(); % task4
             
-            addDescptBatch.waitBatch();
-            addDescptBatch.collectBatchOutput();
-            addDescptBatch.retryBatch();
-            if ~addDescptBatch.hasValidOutput
-                error("Preprocessor:InvalidBatchOutput","Invalid Output from adding page description");
+            if istf(obj.Pages)
+                addDescptBatch = obj.addPageDescription(); % taks5
+                addDesCleanup = onCleanup(@() addDescptBatch.cleanUp());
+                obj.extractRegMap(); % task4
+            
+                addDescptBatch.waitBatch();
+                addDescptBatch.collectBatchOutput();
+                addDescptBatch.retryBatch();
+                if ~addDescptBatch.hasValidOutput
+                    error("Preprocessor:InvalidBatchOutput","Invalid Output from adding page description");
+                end
+                obj.Pages = preprocessing.page.parseDescriptionContent(obj.Pages,addDescptBatch.Contents,addDescptBatch.CustomIds);
             end
-            obj.preprocessing.page.parseDescriptionContent(addDescptBatch.Contents,)
-
-
-
-
         end
 
         function runOcr(obj,mistral)
@@ -134,7 +142,7 @@ classdef Preprocessor < handle
         end
 
         function getRegPageIdx(obj)
-            %% Get register-map-page and register-summary page number from toc
+            % Get register-map-page and register-summary page number from toc
             pages = preprocessing.toc.findTocPages(obj.Pages);
             tocIdx = find(arrayfun(@(onePage) onePage.result_toc.is_toc, pages));
             tocEntries = preprocessing.toc.extractTocEntry(pages(tocIdx));
@@ -145,7 +153,7 @@ classdef Preprocessor < handle
             obj.TocEntries = tocEntries;
             obj.TocPageIdx = tocIdx;
             
-            %% Get register-map-page and register-summary page number through whole-text-retrieval
+            % Get register-map-page and register-summary page number through whole-text-retrieval
             pages = preprocessing.retrieval.findRelevantPageRange(pages,"register");
             regPageIdx = find(arrayfun(@(onePage) onePage.result_retrieval.is_reg_map_relevant, pages));
             regSumIdx = find(arrayfun(@(onePage) onePage.result_retrieval.is_reg_sum_relevant, pages));
@@ -153,7 +161,7 @@ classdef Preprocessor < handle
             obj.RegPageIdxFromRetrieval = regPageIdx;
             obj.RegSumIdxFromRetrieval = regSumIdx;
 
-            %% Get register-map-page and register-summary page number from LLM
+            % Get register-map-page and register-summary page number from LLM
             regPageIdx = find(arrayfun(@(onePage) onePage.classification.is_register_map_relevant, pages));
             regSumIdx = find(arrayfun(@(onePage) onePage.classification.is_register_summary_relevant, pages));
 
@@ -207,6 +215,11 @@ classdef Preprocessor < handle
             inputName = funName +".jsonl";
             inputPath = fullfile(obj.Config.Paths.InputDir,inputName);
             taskConfig = obj.Config.Openai.Task.verifyRegSumPages;
+
+            if isempty(obj.RegSumIdxCandidate)
+                regSumBatch = PageBatchTask.empty;
+                return
+            end
             
             regSumCandidates = obj.Pages(obj.RegSumIdxCandidate);
             regSumCandidates = rmfield(regSumCandidates,"classification");
@@ -226,6 +239,11 @@ classdef Preprocessor < handle
             inputName = funName +".jsonl";
             inputPath = fullfile(obj.Config.Paths.InputDir,inputName);
             taskConfig = obj.Config.Openai.Task.verifyRegMapPages;
+
+            if isempty(obj.RegPageIdxCandidate)
+                regPageBatch = PageBatchTask.empty;
+                return
+            end
             
             regPageCandidates = obj.Pages(obj.RegPageIdxCandidate);
             regPageCandidates = rmfield(regPageCandidates,"classification");
@@ -239,14 +257,20 @@ classdef Preprocessor < handle
         end
         
         function extractRegIndex(obj)
+            if isempty(obj.RegSumPageIdx)
+                return
+            end
+
             pages = struct( ...
                 "index",    {obj.Pages.index}, ...
                 "markdown", {obj.Pages.markdown}, ...
                 "tables",   {obj.Pages.tables});
-            taskPrompt = jsonencode(pages(obj.RegSumPageIdx));
+
+            taskPrompt = struct("pages", pages(obj.RegSumPageIdx));
+            taskPrompt = jsonencode(taskPrompt);
             taskConfig = obj.Config.Openai.Task.extractRegIndex;
             
-            regIdxExtractor = openai.OpenaiTaskAgent(config.getKey("openai"),taskPrompt,taskConfig);
+            regIdxExtractor = openai.OpenaiTaskAgent(obj.Config.getKey("openai"),taskPrompt,taskConfig);
             obj.RegSummary = regIdxExtractor.runTask();
         end
 
@@ -259,7 +283,7 @@ classdef Preprocessor < handle
             taskPrompt = jsonencode(taskPrompt);
             taskConfig = obj.Config.Openai.Task.extractRegMap;
 
-            regMapExtractor = openai.OpenaiTaskAgent(config.getKey("openai"),taskPrompt,taskConfig);
+            regMapExtractor = openai.OpenaiTaskAgent(obj.Config.getKey("openai"),taskPrompt,taskConfig);
             obj.RegMap = regMapExtractor.runTask();
 
         end
@@ -305,4 +329,29 @@ classdef Preprocessor < handle
         end
     end
 end
-        
+
+function tf = allClassificationFalse(pages)
+    arguments
+        pages (1,:) struct
+    end
+
+    if isempty(pages)
+        tf = true;
+        return
+    end
+
+    classifications = [pages.classification];
+
+    fieldNames = string(fieldnames(classifications));
+    tf = true;
+
+    for i = 1:numel(fieldNames)
+        fieldName = fieldNames(i);
+        values = [classifications.(fieldName)];
+
+        if any(values)
+            tf = false;
+            return
+        end
+    end
+end

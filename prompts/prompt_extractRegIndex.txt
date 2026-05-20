@@ -42,7 +42,7 @@ The register name.
 Copy the register name exactly as written when possible.
 If unavailable, do not create this register object.
 
-### 1.2 'adress': string
+### 1.2 'address': string
 The register address.
 Preserve the original address format as much as possible.
 If unavailable, use "empty".

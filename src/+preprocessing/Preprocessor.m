@@ -55,38 +55,45 @@ classdef Preprocessor < handle
             [regSumBatch,regPageBatch] = obj.verifyRegisterPages(); %task1, 2
             regSumCleanup = onCleanup(@() regSumBatch.cleanUp());
             regPageCleanup = onCleanup(@() regPageBatch.cleanUp());
-           
-            regSumBatch.waitBatch();
-            regSumBatch.collectBatchOutput();
-            regSumBatch.retryBatch();
-            if ~regSumBatch.hasValidOutput
-                error("Preprocessor:InvalidBatchOutput","Invalid Output from register summary page verification");
+            
+            if ~isempty(regSumBatch)
+                regSumBatch.waitBatch();
+                regSumBatch.collectBatchOutput();
+                regSumBatch.retryBatch();
+
+                if ~regSumBatch.hasValidOutput
+                    error("Preprocessor:InvalidBatchOutput","Invalid Output from register summary page verification");
+                end
+                obj.RegSumPageIdx = preprocessing.page.parseVerificationContent(regSumBatch.Contents,regSumBatch.CustomIds,obj.RegSumIdxCandidate);
             end
-            obj.RegSumPageIdx = preprocessing.page.parseVerificationContent(regSumBatch.Contents,regSumBatch.CustomIds,obj.RegSumIdxCandidate);
             
             obj.extractRegIndex(); % task 3
             
-            regPageBatch.waitBatch();
-            regPageBatch.collectBatchOutput();
-            regPageBatch.retryBatch();
-            if ~regPageBatch.hasValidOutput
-                error("Preprocessor:InvalidBatchOutput","Invalid Output from register map page verification");
+            if ~isempty(regPageBatch)
+                regPageBatch.waitBatch();
+                regPageBatch.collectBatchOutput();
+                regPageBatch.retryBatch();
+                if ~regPageBatch.hasValidOutput
+                    error("Preprocessor:InvalidBatchOutput","Invalid Output from register map page verification");
+                end
+                obj.RegPageIdx = preprocessing.page.parseVerificationContent(regPageBatch.Contents,regPageBatch.CustomIds,obj.RegPageIdxCandidate);
             end
-            obj.RegPageIdx = preprocessing.page.parseVerificationContent(regPageBatch.Contents,regPageBatch.CustomIds,obj.RegPageIdxCandidate);
             
             obj.refineClassification();
             
-            addDescptBatch = obj.addPageDescription(); % taks5
-            addDesCleanup = onCleanup(@() addDescptBatch.cleanUp());
-            obj.extractRegMap(); % task4
+            if ~allClassificationFalse(obj.Pages)
+                addDescptBatch = obj.addPageDescription(); % taks5
+                addDesCleanup = onCleanup(@() addDescptBatch.cleanUp());
+                obj.extractRegMap(); % task4
             
-            addDescptBatch.waitBatch();
-            addDescptBatch.collectBatchOutput();
-            addDescptBatch.retryBatch();
-            if ~addDescptBatch.hasValidOutput
-                error("Preprocessor:InvalidBatchOutput","Invalid Output from adding page description");
+                addDescptBatch.waitBatch();
+                addDescptBatch.collectBatchOutput();
+                addDescptBatch.retryBatch();
+                if ~addDescptBatch.hasValidOutput
+                    error("Preprocessor:InvalidBatchOutput","Invalid Output from adding page description");
+                end
+                obj.Pages = preprocessing.page.parseDescriptionContent(obj.Pages,addDescptBatch.Contents,addDescptBatch.CustomIds);
             end
-            obj.Pages = preprocessing.page.parseDescriptionContent(obj.Pages,addDescptBatch.Contents,addDescptBatch.CustomIds);
         end
 
         function runOcr(obj,mistral)
@@ -208,6 +215,11 @@ classdef Preprocessor < handle
             inputName = funName +".jsonl";
             inputPath = fullfile(obj.Config.Paths.InputDir,inputName);
             taskConfig = obj.Config.Openai.Task.verifyRegSumPages;
+
+            if isempty(obj.RegSumIdxCandidate)
+                regSumBatch = PageBatchTask.empty;
+                return
+            end
             
             regSumCandidates = obj.Pages(obj.RegSumIdxCandidate);
             regSumCandidates = rmfield(regSumCandidates,"classification");
@@ -227,6 +239,11 @@ classdef Preprocessor < handle
             inputName = funName +".jsonl";
             inputPath = fullfile(obj.Config.Paths.InputDir,inputName);
             taskConfig = obj.Config.Openai.Task.verifyRegMapPages;
+
+            if isempty(obj.RegPageIdxCandidate)
+                regPageBatch = PageBatchTask.empty;
+                return
+            end
             
             regPageCandidates = obj.Pages(obj.RegPageIdxCandidate);
             regPageCandidates = rmfield(regPageCandidates,"classification");
@@ -240,6 +257,10 @@ classdef Preprocessor < handle
         end
         
         function extractRegIndex(obj)
+            if isempty(obj.RegSumPageIdx)
+                return
+            end
+
             pages = struct( ...
                 "index",    {obj.Pages.index}, ...
                 "markdown", {obj.Pages.markdown}, ...
@@ -308,4 +329,29 @@ classdef Preprocessor < handle
         end
     end
 end
-        
+
+function tf = allClassificationFalse(pages)
+    arguments
+        pages (1,:) struct
+    end
+
+    if isempty(pages)
+        tf = true;
+        return
+    end
+
+    classifications = [pages.classification];
+
+    fieldNames = string(fieldnames(classifications));
+    tf = true;
+
+    for i = 1:numel(fieldNames)
+        fieldName = fieldNames(i);
+        values = [classifications.(fieldName)];
+
+        if any(values)
+            tf = false;
+            return
+        end
+    end
+end
