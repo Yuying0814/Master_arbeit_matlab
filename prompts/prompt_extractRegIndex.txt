@@ -32,7 +32,7 @@ Not relevant for this task.
 
 ## Output
 
-1. 'registers': struct array
+1. 'registers': JSON object array
 The top-level output must be a struct array of register objects.
 
 Each 'registers(i)' contains the following 5 fields:

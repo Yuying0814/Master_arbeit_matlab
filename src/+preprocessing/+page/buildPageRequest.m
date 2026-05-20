@@ -4,7 +4,7 @@ function userRequest = buildPageRequest(pages,reqName)
         reqName (1,1) string
     end
     
-    keptFields = ["index", "markdown","tables"];
+    keptFields = ["index", "markdown","tables","classification"];
     fields = string(fieldnames(pages));
     rmFields = setdiff(fields, keptFields);
     pages = rmfield(pages, rmFields);

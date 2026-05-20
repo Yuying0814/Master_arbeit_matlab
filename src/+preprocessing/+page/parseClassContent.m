@@ -1,7 +1,6 @@
-function outPages = returnClassification(pages,contents)
-    defaultValue = preprocessing.classification.getDefaultFormat();
+function outPages = parseClassContent(pages,contents,customIds)
+    defaultValue = preprocessing.page.getClassificationFormat();
     
-    customIds = [contents.custom_id];
     for i = 1:numel(customIds)
         customId = customIds(i);
         contentIdx = find(strcmp(customId, [contents.custom_id]), 1);
@@ -13,5 +12,7 @@ function outPages = returnClassification(pages,contents)
 
         pages(i).classification = contents(contentIdx).content;
     end
+
+    outPages = pages;
 end
 

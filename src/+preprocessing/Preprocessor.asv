@@ -52,30 +52,40 @@ classdef Preprocessor < handle
             obj.classifyPages();
             obj.getRegPageIdx();
 
-            [regSumBatch,regPageBatch] = verifyRegisterPages(obj);
+            [regSumBatch,regPageBatch] = obj.verifyRegisterPages(); %task1, 2
             regSumBatch.waitBatch();
             regSumBatch.collectBatchOutput();
             regSumBatch.obj.retryBatch();
             if ~regSumBatch.hasValidOutput
                 error("Preprocessor:InvalidBatchOutput","Invalid Output from register summary page verification");
             end
-            obj.RegSumPageIdx = preprocessing.classification.parseVerificationContent(regSumBatch.Contents);
+            obj.RegSumPageIdx = preprocessing.page.parseVerificationContent(regSumBatch.Contents,regSumBatch.CustomIds);
             
-            obj.extractRegIdex(); % task 3
+            obj.extractRegIndex(); % task 3
             
             regPageBatch.waitBatch();
             regPageBatch.collectBatchOutput();
             regPageBatch.obj.retryBatch();
             if ~regPageBatch.hasValidOutput
-                error("Preprocessor:InvalidBatchOutput","Invalid Output from register summary page verification");
+                error("Preprocessor:InvalidBatchOutput","Invalid Output from register map page verification");
             end
-            obj.RegSumPageIdx = preprocessing.classification.parseVerificationContent(regSumBatch.Contents);
+            obj.RegPageIdx = preprocessing.page.parseVerificationContent(regPageBatch.Contents,regPageBatch.CustomIds);
+            
+            obj.refineClassification();
+            addDescptBatch = addPageDescription(obj); % taks5
+            obj.extractRegMap(); % task4
+            
+            addDescptBatch.waitBatch();
+            addDescptBatch.collectBatchOutput();
+            addDescptBatch.retryBatch();
+            if ~addDescptBatch.hasValidOutput
+                error("Preprocessor:InvalidBatchOutput","Invalid Output from adding page description");
+            end
+            obj.preprocessing.page.parseDescriptionContent(addDescptBatch.Contents,)
 
-            task3 = obj.addAnotation(); % task5
-            obj.extractRegMap();% task 4
-            task3 = obj.BatchClient.waitBatch(task3);
-            content3 = obj.BatchClient.collectJobOutput(task3);
-            obj.xxx = content3;
+
+
+
         end
 
         function runOcr(obj,mistral)
@@ -160,29 +170,29 @@ classdef Preprocessor < handle
             arguments
                 obj (1,1) preprocessing.Preprocessor
             end
-            import preprocessing.classification.PageBatchTask
-            import preprocessing.classification.returnClassification
+            import preprocessing.page.PageBatchTask
+            import preprocessing.page.parseClassContent
 
-            pages = obj.Pages;
             taskConfig = obj.Config.Openai.Task.classifyPages;
             funName = obj.getMethodName();
             inputName = funName +".jsonl";
             inputPath = fullfile(obj.Config.Paths.InputDir,inputName);
 
             classification = PageBatchTask( ...
-                pages, ...
+                obj.Pages, ...
                 obj.BatchClient, ...
                 inputPath, ...
                 taskConfig);
 
             classification.run();
+            if ~classification.hasValidOutput
+                error("Preprocessor:InvalidBatchOutput","Invalid Output from page classification");
+            end
 
             contents = classification.Contents;
             messages = classification.Messages;
             batchLines = classification.BatchLines;
-
-            obj.Pages = preprocessing.classification.returnClassification(pages,contents);
-
+            obj.Pages = parseClassContent(obj.Pages,contents,classification.CustomIds);
         end
 
         function [regSumBatch,regPageBatch] = verifyRegisterPages(obj)
@@ -191,7 +201,7 @@ classdef Preprocessor < handle
         end
 
         function regSumBatch = verifyRegSumPages(obj)
-            import preprocessing.classification.PageBatchTask
+            import preprocessing.page.PageBatchTask
             
             funName = obj.getMethodName();
             inputName = funName +".jsonl";
@@ -199,6 +209,7 @@ classdef Preprocessor < handle
             taskConfig = obj.Config.Openai.Task.verifyRegSumPages;
             
             regSumCandidates = obj.Pages(obj.RegSumIdxCandidate);
+            regSumCandidates = rmfield(regSumCandidates,"classification");
 
             regSumBatch = PageBatchTask(...
                 regSumCandidates, ...
@@ -209,7 +220,7 @@ classdef Preprocessor < handle
         end
 
         function regPageBatch = verifyRegMapPages(obj)
-            import preprocessing.classification.PageBatchTask
+            import preprocessing.page.PageBatchTask
             
             funName = obj.getMethodName();
             inputName = funName +".jsonl";
@@ -217,6 +228,7 @@ classdef Preprocessor < handle
             taskConfig = obj.Config.Openai.Task.verifyRegMapPages;
             
             regPageCandidates = obj.Pages(obj.RegPageIdxCandidate);
+            regPageCandidates = rmfield(regPageCandidates,"classification");
 
             regPageBatch = PageBatchTask(...
                 regPageCandidates, ...
@@ -225,7 +237,64 @@ classdef Preprocessor < handle
                 taskConfig);
             regPageBatch.submitBatch();
         end
-   
+        
+        function extractRegIndex(obj)
+            pages = struct( ...
+                "index",    {obj.Pages.index}, ...
+                "markdown", {obj.Pages.markdown}, ...
+                "tables",   {obj.Pages.tables});
+            taskPrompt = jsonencode(pages(obj.RegSumPageIdx));
+            taskConfig = obj.Config.Openai.Task.extractRegIndex;
+            
+            regIdxExtractor = openai.OpenaiTaskAgent(config.getKey("openai"),taskPrompt,taskConfig);
+            obj.RegSummary = regIdxExtractor.runTask();
+        end
+
+        function extractRegMap(obj)
+            pages = struct( ...
+                "index",    {obj.Pages.index}, ...
+                "markdown", {obj.Pages.markdown}, ...
+                "tables",   {obj.Pages.tables});
+            taskPrompt = struct("pages",pages(obj.RegPageIdx),"registers",obj.RegSummary.registers);
+            taskPrompt = jsonencode(taskPrompt);
+            taskConfig = obj.Config.Openai.Task.extractRegMap;
+
+            regMapExtractor = openai.OpenaiTaskAgent(config.getKey("openai"),taskPrompt,taskConfig);
+            obj.RegMap = regMapExtractor.runTask();
+
+        end
+
+        function refineClassification(obj)
+            for i = 1:numel(obj.Pages)
+                if any(i == obj.RegSumPageIdx)
+                    obj.Pages(i).classification.is_register_summary_relevant = true;
+                else
+                    obj.Pages(i).classification.is_register_summary_relevant = false;
+                end
+
+                if any(i == obj.RegPageIdx)
+                    obj.Pages(i).classification.is_register_map_relevant = true;
+                else
+                    obj.Pages(i).classification.is_register_map_relevant = false;
+                end
+            end
+        end
+
+        function addDescptBatch = addPageDescription(obj)
+            import preprocessing.page.PageBatchTask
+
+            funName = obj.getMethodName();
+            inputName = funName +".jsonl";
+            inputPath = fullfile(obj.Config.Paths.InputDir,inputName);
+            taskConfig = obj.Config.Openai.Task.addPageDescription;
+
+            addDescptBatch = PageBatchTask(...
+                obj.Pages, ...
+                obj.BatchClient, ...
+                inputPath, ...
+                taskConfig);
+            addDescptBatch.submitBatch();
+        end
 
     end
     

@@ -122,7 +122,7 @@ classdef Config < handle
             
             obj.Openai.Task.classifyPages.ModelName = "gpt-5-mini";
             obj.Openai.Task.classifyPages.PromptPath = fullfile(obj.Paths.PromptsDir,"prompt_classifyPages.txt");
-            obj.Openai.Task.classifyPages.ResponseFormat = preprocessing.page.getClassificationFormat();
+            obj.Openai.Task.classifyPages.ResponseFormat = preprocessing.page.getDefaultFormat();
             obj.Openai.Task.classifyPages.MaxCompletionTokens = 2000;
             
             obj.Openai.Task.verifyRegSumPages.ModelName = "gpt-5-mini";
@@ -136,8 +136,8 @@ classdef Config < handle
             obj.Openai.Task.verifyRegMapPages.MaxCompletionTokens = 1000;
 
             obj.Openai.Task.addPageDescription.ModelName = "gpt-5-mini";
-            obj.Openai.Task.addPageDescription.PromptPath = fullfile(obj.Paths.PromptsDir,"prompt_addPageDescription.txt");
-            obj.Openai.Task.addPageDescription.ResponseFormat = preprocessing.page.getDescriptionFormat();
+            obj.Openai.Task.addPageDescription.PromptPath = fullfile(obj.Paths.PromptsDir,"prompt_verifyRegMapPages.txt");
+            obj.Openai.Task.addPageDescription.ResponseFormat = preprocessing.page.getDes;
             obj.Openai.Task.addPageDescription.MaxCompletionTokens = 2000;
 
             obj.Openai.Task.extractRegIndex.ModelName = "gpt-5-mini";

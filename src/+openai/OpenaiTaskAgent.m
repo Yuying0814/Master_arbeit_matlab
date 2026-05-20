@@ -2,34 +2,33 @@ classdef OpenaiTaskAgent < handle
     %UNTITLED4 Summary of this class goes here
     %   Detailed explanation goes here
     properties
-        ModelName (1,1) string
-        SystemPrompt (1,1) string
-        ResponseFormat {openai.mustBeValidResponseFormat}
+        ModelName (1,1) string = "gpt-5-mini"
         Tools openAIFunction = openAIFunction.empty
-        GenerateTimeOut (1,1) double {mustBePositive, mustBeFinite}
+        GenerateTimeOut (1,1) double {mustBePositive, mustBeFinite} = 3000
     end
 
     properties(Access = private)
-        ApiKey (1,1) string
+        ApiKey (1,1) string = ""
     end
     
     properties(SetAccess = private)
-        Chat openAIChat
-        Messages openAIMessages
-        TokenConsumption (1,1) double 
+        Chat (1,1) openAIChat
+        Messages (1,1) messageHistory
+        SystemPrompt (1,1) string = ""
+        TaskPrompt (1,1) string = ""
+        ResponseFormat (1,1) {openai.mustBeValidResponseFormat} = "text"
+        TokenConsumption (1,1) double = 0
     end
 
     methods
-        function obj = OpenaiTaskAgent(apiKey,generateTimeOut,taskConfig)
+        function obj = OpenaiTaskAgent(apiKey,taskPrompt,taskConfig,generateTimeOut)
             %UNTITLED4 Construct an instance of this class
             %   Detailed explanation goes here
             arguments
                 apiKey (1,1) string
+                taskPrompt (1,1) string
+                taskConfig (1,1) struct
                 generateTimeOut (1,1) double {mustBePositive, mustBeFinite} = 3000
-                taskConfig.ModelName (1,1) string = "gpt-5-mini"
-                taskConfig.PromptPath (1,1) string = ""
-                taskConfig.ResponseFormat{openai.mustBeValidResponseFormat} = "text"
-                taskConfig.Tools openAIFunction = openAIFunction.empty
             end
             
             if isempty(apiKey) || strlength(apiKey) == 0
@@ -45,14 +44,24 @@ classdef OpenaiTaskAgent < handle
             else
                 error("OpenaiTaskAgent:FileNotFound","Prompt not found: %s",promptPath);
             end
-            
             obj.SystemPrompt = systemPrompt;
-            obj.ApiKey = apiKey;
-            obj.ModelName = taskConfig.ModelName;
-            obj.ResponseFormat = taskConfig.ResponseFormat;
-            obj.Tools = taskConfig.Tools;
-            obj.GenerateTimeOut = generateTimeOut;
             
+            obj.ApiKey = apiKey;
+            obj.TaskPrompt = string(taskPrompt);
+
+            if isfield(taskConfig,"ModelName")
+                obj.ModelName = taskConfig.ModelName;
+            end
+
+            if isfield(taskConfig,"ResponseFormat")
+                obj.ResponseFormat = taskConfig.ResponseFormat;
+            end
+
+            if isfield(taskConfig,"Tools")
+                obj.Tools = taskConfig.Tools;
+            end
+
+            obj.GenerateTimeOut = generateTimeOut;
             obj.resetMessages();
             obj.resetTokenConsumption();
             
@@ -61,7 +70,6 @@ classdef OpenaiTaskAgent < handle
                     obj.SystemPrompt, ...
                     APIKey = obj.ApiKey, ...
                     ModelName = obj.ModelName,...
-                    ResponseFormat = obj.ResponseFormat, ...
                     Tools = obj.Tools ...
                     );
 
@@ -70,17 +78,15 @@ classdef OpenaiTaskAgent < handle
             end
         end
 
-        function [output,message,response] = runTask(obj,userMessage)
-            arguments
-                obj (1,1) OpenaiTaskAgent
-                userMessage {mustBeTextScalar}
-            end
-            newMessages = addUserMessage(obj.Messages, string(userMessage));
-
+        function [output,message,response] = runTask(obj)
+            
+            newMessages = addUserMessage(obj.Messages,obj.TaskPrompt);
+            
             try
                 [output,message,response] = generate( ...
                     obj.Chat, ...
                     newMessages, ...
+                    ResponseFormat= obj.ResponseFormat, ...
                     TimeOut=obj.GenerateTimeOut ...
                     );
                 newMessages = addResponseMessage(newMessages,message);
@@ -90,11 +96,28 @@ classdef OpenaiTaskAgent < handle
             
             obj.Messages = newMessages;
             obj.TokenConsumption = obj.TokenConsumption + getTotalTokens(response);
+        end
 
+        function [output,message,response] = runChat(obj,userMessage)
+            newMessages = addUserMessage(obj.Messages, string(userMessage));
+
+            try
+                [output,message,response] = generate( ...
+                    obj.Chat, ...
+                    newMessages, ...
+                    ResponseFormat = "text", ...
+                    TimeOut=obj.GenerateTimeOut ...
+                    );
+                newMessages = addResponseMessage(newMessages,message);
+            catch ME
+                error("OpenaiTaskAgent:RunChatError","Error in generating answer: \n%s",ME.message);
+            end
+            obj.Messages = newMessages;
+            obj.TokenConsumption = obj.TokenConsumption + getTotalTokens(response);
         end
         
         function resetMessages(obj)
-            obj.Messages = openAIMessages;
+            obj.Messages = messageHistory;
         end
 
         function resetTokenConsumption(obj)

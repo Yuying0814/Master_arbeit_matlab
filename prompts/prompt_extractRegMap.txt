@@ -3,7 +3,7 @@ Your task is to extract register information only from the user-provided content
 
 # Input
 
-1. `pages`: JSON array.
+1. `pages`: JSON object array.
 The provided register-detail page contexts.
 
 Each `pages(i)` is a single-page context object and may contain the following fields:
@@ -32,19 +32,19 @@ The table format.
 1.3.4 `word_confidence_scores`: any  
 Not relevant for this task.
 
-2. `preRegisters`: struct array.
+2. `registers`: JSON object array.
 Preliminary register-name information extracted by a previous model from register summary or register map pages.
 
-Use `preRegisters` only as a non-authoritative reference for checking and completing the register list.
+Use `registers` only as a non-authoritative reference for checking and completing the register list.
 Do not blindly copy it.
-If `preRegisters` conflicts with the provided `pages` content, correct it using only the provided `pages` content.
+If `registers` conflicts with the provided `pages` content, correct it using only the provided `pages` content.
 
-Each `preRegisters(i)` may contain the following fields:
+Each `Registers(i)` may contain the following fields:
 
 2.1 `name`: string  
 The preliminary register name.
 
-2.2 `address`: object  
+2.2 `address`: string 
 The preliminary register address information.
 
 2.3 `bank`: string  
@@ -232,7 +232,7 @@ If unavailable, leave it empty.
 # General Rules
 
 1. First determine the complete and correct register list, then fill the detailed fields.
-Use `preRegisters` only as a search and checking reference.
+Use `registers` only as a search and checking reference.
 
 2. Extract only information explicitly present in `pages.markdown` and the corresponding `pages.tables.content`.
 

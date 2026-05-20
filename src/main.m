@@ -6,13 +6,9 @@ config = Config(env,pdf);
 disp(config);
 
 txtPrep = preprocessing.Preprocessor(config);
-
 disp(txtPrep);
 txtPrep.runOcr();
 disp(txtPrep);
-[contents messages responses]= txtPrep.classifyPages();
-disp(txtPrep);
-txtPrep.getRegPageIdx()
-disp(txtPrep);
+
 
 

@@ -78,8 +78,14 @@ classdef OpenaiBatch < handle
             obj.writeBatchReqFile(inputPath);
         
             inputFileId = obj.uploadBatchRequest(inputPath);
-            batchId = obj.getBatchId(inputFileId);
 
+            try
+                batchId = obj.getBatchId(inputFileId);
+            catch ME
+                obj.deleteUploadedFile(inputFileId);
+                rethrow(ME);
+            end
+            
             job.update(BatchId=batchId,InputFileId=inputFileId,Status="submitted");
         end
 
@@ -93,7 +99,7 @@ classdef OpenaiBatch < handle
             while true
                 batchInfo = obj.getBatchInfo(job.BatchId);
                 job.updateBatchInfo(batchInfo);
-                disp(job);
+                fprintf("Name: %s\nStatus: %s\n",job.Name,job.Status);
         
                 if job.isTerminal()
                     break
@@ -129,7 +135,7 @@ classdef OpenaiBatch < handle
             [contents,messages,batchLines] = obj.parseBatchOutput(rawOutput);
         end
 
-        function cleanupJob(obj,job)
+        function cleanupBatchJob(obj,job)
             arguments
                 obj (1,1) openai.OpenaiBatch
                 job (1,1) openai.BatchJob
