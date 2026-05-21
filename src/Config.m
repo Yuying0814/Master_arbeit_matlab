@@ -130,10 +130,10 @@ classdef Config < handle
             obj.Openai.Task.verifyRegSumPages.ResponseFormat = "text";
             obj.Openai.Task.verifyRegSumPages.MaxCompletionTokens = 1000;
 
-            obj.Openai.Task.verifyRegMapPages.ModelName = "gpt-5-mini";
-            obj.Openai.Task.verifyRegMapPages.PromptPath = fullfile(obj.Paths.PromptsDir,"prompt_verifyRegMapPages.txt");
-            obj.Openai.Task.verifyRegMapPages.ResponseFormat = "text";
-            obj.Openai.Task.verifyRegMapPages.MaxCompletionTokens = 1000;
+            obj.Openai.Task.verifyRegPages.ModelName = "gpt-5-mini";
+            obj.Openai.Task.verifyRegPages.PromptPath = fullfile(obj.Paths.PromptsDir,"prompt_verifyRegPages.txt");
+            obj.Openai.Task.verifyRegPages.ResponseFormat = "text";
+            obj.Openai.Task.verifyRegPages.MaxCompletionTokens = 1000;
 
             obj.Openai.Task.addPageDescription.ModelName = "gpt-5-mini";
             obj.Openai.Task.addPageDescription.PromptPath = fullfile(obj.Paths.PromptsDir,"prompt_addPageDescription.txt");

@@ -34,7 +34,7 @@ Not relevant for this task.
 
 2. `registers`: JSON object array.
 Preliminary register-name information extracted by a previous model from register summary or register map pages.
-
+If `registers` is an empty array, it means the previous step did not provide any preliminary register candidates. This may be because no register was found or no register-summary page was detected in the previous step.
 Use `registers` only as a non-authoritative reference for checking and completing the register list.
 Do not blindly copy it.
 If `registers` conflicts with the provided `pages` content, correct it using only the provided `pages` content.

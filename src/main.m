@@ -6,9 +6,6 @@ config = Config(env,pdf);
 disp(config);
 
 txtPrep = preprocessing.Preprocessor(config);
-disp(txtPrep);
-txtPrep.runOcr();
-disp(txtPrep);
 
 
 
