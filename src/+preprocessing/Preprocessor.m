@@ -23,7 +23,7 @@ classdef Preprocessor < handle
 
         BatchClient  openai.OpenaiBatch = openai.OpenaiBatch.empty
         MistralClient preprocessing.mistral.Mistral = preprocessing.mistral.Mistral.empty
-        TaskClassification preprocessing.mistral.Mistral = preprocessing.mistral.Mistral.empty
+        TaskClassification preprocessing.page.PageBatchTask = preprocessing.page.PageBatchTask.empty
         TaskRegSumVerfi preprocessing.page.PageBatchTask = preprocessing.page.PageBatchTask.empty
         TaskRegPageVerifi preprocessing.page.PageBatchTask = preprocessing.page.PageBatchTask.empty
         TaskAddDescpt preprocessing.page.PageBatchTask = preprocessing.page.PageBatchTask.empty
@@ -176,7 +176,7 @@ classdef Preprocessor < handle
                 obj (1,1) preprocessing.Preprocessor
             end
             import preprocessing.page.PageBatchTask
-            import preprocessing.page.parseClassContent
+            import preprocessing.page.parseClassificationContent
 
             taskConfig = obj.Config.Openai.Task.classifyPages;
             funName = obj.getMethodName();
