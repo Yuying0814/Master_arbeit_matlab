@@ -53,10 +53,14 @@ classdef Preprocessor < handle
         
         function pipeline(obj)
             obj.runOcr();
+            disp("Ocr completed");
             obj.classifyPages();
+            disp("Page classification copleted");
             obj.getRegPageCandidateIdx();
+            disp("Page candidate index updated");
 
             obj.createVerificationTask(); % submit batch task1,2
+            disp("Verification Task created");
             regSumCleanup = onCleanup(@() obj.TaskRegSumVerfi.cleanUp());
             regPageCleanup = onCleanup(@() obj.TaskRegPageVerifi.cleanUp());
 
@@ -70,6 +74,7 @@ classdef Preprocessor < handle
             end
             
             obj.extractRegIndex(); % run chat task 3
+            disp("Register index extraction completed");
             obj.waitAndCollect(obj.TaskRegPageVerifi); % collect taks2 result
             
             if ~isempty(obj.TaskRegPageVerifi)
@@ -80,6 +85,7 @@ classdef Preprocessor < handle
             end
             
             obj.refineClassification();
+            disp("refinition completed");
             
             if ~allClassificationFalse(obj.Pages)
                 obj.createAddDescriptionTask(); % submit batch taks5
@@ -87,10 +93,13 @@ classdef Preprocessor < handle
             end
 
             obj.extractRegMap(); % run chat task4
+            disp("Register map extraciton completed");
             obj.waitAndCollect(obj.TaskAddDescpt); % collcet task5 result
+            
             if ~isempty(obj.TaskAddDescpt)
                 obj.Pages = preprocessing.page.parseDescriptionContent(obj.Pages,obj.TaskAddDescpt.Contents,obj.TaskAddDescpt.CustomIds);
             end
+            disp("Add description completed");
         end
 
         function runOcr(obj,mistral)

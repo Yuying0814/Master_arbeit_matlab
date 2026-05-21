@@ -99,7 +99,7 @@ function [sectionNum,sectionLevel] = sectionIdent(thisLine)
     sectionNumToken = regexp(cleanLine,'^(\d+(?:\.\d+)*)\.?\s+','tokens','once');
     
     if isempty(sectionNumToken)
-        if matchPattern(thisLine,'^#')
+        if preprocessing.utils.matchPattern(thisLine,'^#')
             sectionLevel = 1;
             return
         end
