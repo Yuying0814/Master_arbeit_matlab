@@ -47,8 +47,7 @@ The current page must contain continuation evidence or topic-relevant content of
 
 ## Output
 
-### 1. 'answer': String
-Return exactly one of the following two values:
+Reply with exactly one word:
 
 - `yes`
 - `no`

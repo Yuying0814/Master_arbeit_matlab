@@ -82,13 +82,13 @@ classdef Preprocessor < handle
             
             if ~allClassificationFalse(obj.Pages)
                 obj.createAddDescriptionTask(); % submit batch taks5
-                addDesCleanup = onCleanup(@() addDescptBatch.cleanUp());
+                addDesCleanup = onCleanup(@() obj.TaskAddDescpt.cleanUp());
             end
 
             obj.extractRegMap(); % run chat task4
             obj.waitAndCollect(obj.TaskAddDescpt) % collcet task5 result
             if ~isempty(obj.TaskAddDescpt)
-                obj.Pages = preprocessing.page.parseDescriptionContent(obj.Pages,addDescptBatch.Contents,addDescptBatch.CustomIds);
+                obj.Pages = preprocessing.page.parseDescriptionContent(obj.Pages,obj.TaskAddDescpt.Contents,obj.TaskAddDescpt.CustomIds);
             end
         end
 
@@ -341,7 +341,7 @@ classdef Preprocessor < handle
             pageBatchTask.retryBatch();
 
             if ~pageBatchTask.hasValidOutput
-                error("Preprocessor:InvalidBatchOutput","Invalid Output from: %s",inputname(2));
+                error("Preprocessor:InvalidBatchOutput","Invalid Output from: %s",pageBatchTask.Name);
             end
         end
 
