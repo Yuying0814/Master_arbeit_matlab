@@ -23,6 +23,7 @@ classdef Preprocessor < handle
 
         BatchClient  openai.OpenaiBatch = openai.OpenaiBatch.empty
         MistralClient preprocessing.mistral.Mistral = preprocessing.mistral.Mistral.empty
+        TaskClassification preprocessing.mistral.Mistral = preprocessing.mistral.Mistral.empty
         TaskRegSumVerfi preprocessing.page.PageBatchTask = preprocessing.page.PageBatchTask.empty
         TaskRegPageVerifi preprocessing.page.PageBatchTask = preprocessing.page.PageBatchTask.empty
         TaskAddDescpt preprocessing.page.PageBatchTask = preprocessing.page.PageBatchTask.empty
@@ -170,7 +171,7 @@ classdef Preprocessor < handle
             obj.Pages = pages;
         end
 
-        function [contents,messages,batchLines] = classifyPages(obj)
+        function classifyPages(obj)
             arguments
                 obj (1,1) preprocessing.Preprocessor
             end
@@ -182,21 +183,20 @@ classdef Preprocessor < handle
             inputName = funName +".jsonl";
             inputPath = fullfile(obj.Config.Paths.InputDir,inputName);
 
-            classification = PageBatchTask( ...
+            obj.TaskClassification = PageBatchTask( ...
                 obj.Pages, ...
                 obj.BatchClient, ...
                 inputPath, ...
                 taskConfig);
 
-            classification.run();
-            if ~classification.hasValidOutput
+            obj.TaskClassification.run();
+            if ~obj.TaskClassification.hasValidOutput
                 error("Preprocessor:InvalidBatchOutput","Invalid Output from page classification");
             end
-
-            contents = classification.Contents;
-            messages = classification.Messages;
-            batchLines = classification.BatchLines;
-            obj.Pages = parseClassContent(obj.Pages,contents,classification.CustomIds);
+            obj.Pages = parseClassificationContent( ...
+                obj.Pages, ...
+                obj.TaskClassification.Contents, ...
+                obj.TaskClassification.CustomIds);
         end
 
         function createVerificationTask(obj)

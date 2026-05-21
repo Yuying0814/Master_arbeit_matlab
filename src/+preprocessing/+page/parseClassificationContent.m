@@ -1,4 +1,4 @@
-function outPages = parseClassContent(pages,contents,customIds)
+function outPages = parseClassificationContent(pages,contents,customIds)
     defaultValue = preprocessing.page.getClassificationFormat();
     
     for i = 1:numel(customIds)
