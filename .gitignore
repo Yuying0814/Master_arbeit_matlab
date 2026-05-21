@@ -1,3 +1,6 @@
 .env
 *.asv
 *.mat
+test.mlx
+*.jsonl
+.gitignore

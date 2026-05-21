@@ -86,7 +86,7 @@ classdef Preprocessor < handle
             end
 
             obj.extractRegMap(); % run chat task4
-            obj.waitAndCollect(obj.TaskAddDescpt) % collcet task5 result
+            obj.waitAndCollect(obj.TaskAddDescpt); % collcet task5 result
             if ~isempty(obj.TaskAddDescpt)
                 obj.Pages = preprocessing.page.parseDescriptionContent(obj.Pages,obj.TaskAddDescpt.Contents,obj.TaskAddDescpt.CustomIds);
             end
@@ -355,6 +355,7 @@ classdef Preprocessor < handle
     end
 end
 
+%% Helpers
 function tf = allClassificationFalse(pages)
     arguments
         pages (1,:) struct
