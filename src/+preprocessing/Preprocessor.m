@@ -50,6 +50,10 @@ classdef Preprocessor < handle
             obj.MistralClient = preprocessing.mistral.Mistral(config.getKey("mistral"));
 
         end
+
+        function run(obj)
+            obj.pipeline();
+        end
         
         function pipeline(obj)
             obj.runOcr();

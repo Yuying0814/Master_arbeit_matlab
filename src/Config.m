@@ -34,14 +34,9 @@ classdef Config < handle
                 pdf {mustBeTextScalar} = ""
             end
 
-            stack = dbstack("-completenames");
-            if numel(stack) >= 2
-                callerFile = string(stack(2).file);
-                callerDir = string(fileparts(callerFile));
-                rootPath = string(fileparts(callerDir));
-            else
-                rootPath = string(pwd);
-            end
+            configFile = string(mfilename("fullpath"));
+            srcDir = string(fileparts(configFile));
+            rootPath = string(fileparts(srcDir));
             
             env = string(env);
             pdf = string(pdf);
@@ -171,7 +166,12 @@ classdef Config < handle
         end
 
         function loadPath(obj)
-            addpath(obj.Paths.SrcDir);
+            if ~isfolder(obj.Paths.LLMDir)
+                error("Config:MissingLLMPackage","Missing package of llms-with-matlab-main.\n" + ...
+                    "This script requires support from package llms-with-matlab-main, " + ...
+                    "which can be downloaded from: \n" + ...
+                    "https://github.com/matlab-deep-learning/llms-with-matlab");
+            end
             addpath(obj.Paths.LLMDir);
         end
     end
@@ -181,10 +181,10 @@ function paths = buildPath(rootPath)
     paths.PdfPath = "";
     paths.EnvPath = "";
     paths.RootPath = rootPath;
-    paths.InputDir = fullfile(rootPath,"data","input");
-    paths.OutputDir = fullfile(rootPath,"data","output");
-    paths.LLMDir = fullfile(rootPath,"llms-with-matlab-main");
-    paths.PromptsDir = fullfile(rootPath,"prompts");
-    paths.SrcDir = fullfile(rootPath,"src");
-    paths.TestsDir = fullfile(rootPath,"tests");
+    paths.InputDir = fullfile(rootPath, "data", "input");
+    paths.OutputDir = fullfile(rootPath, "data", "output");
+    paths.LLMDir = fullfile(rootPath, "llms-with-matlab-main");
+    paths.PromptsDir = fullfile(rootPath, "prompts");
+    paths.SrcDir = fullfile(rootPath, "src");
+    paths.TestsDir = fullfile(rootPath, "tests");
 end
