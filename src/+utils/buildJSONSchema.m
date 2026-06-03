@@ -20,7 +20,7 @@ function schema = buildSchema(value)
         error("OpenaiBatch:InvalidEmpty", ...
             "Empty examples {}, [], struct(), struct.empty, and logical.empty are not allowed.");
     end
-
+    
     if iscell(value)||(~isscalar(value) && ~ischar(value))
         schema = arraySchema(value);
         return;

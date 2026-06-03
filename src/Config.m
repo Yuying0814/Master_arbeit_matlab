@@ -38,7 +38,7 @@ classdef Config < handle
             srcDir = string(fileparts(configFile));
             rootPath = string(fileparts(srcDir));
             
-            env = string(env);
+            env = string(env);      
             pdf = string(pdf);
             
             if strlength(pdf) == 0

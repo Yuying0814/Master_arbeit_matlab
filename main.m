@@ -12,7 +12,7 @@
 
 % File Path
 env = "";
-pdfFile = ""; % "D:\MA\pdf\bst-bme280-ds002.pdf"
+pdfFile = "D:\Study\MA\code\pdf\bst-bme280-ds002.pdf"; % "D:\Study\MA\pdf\bst-bme280-ds002.pdf"
 
 % Load source code folder 
 projectRoot = string(fileparts(mfilename("fullpath")));

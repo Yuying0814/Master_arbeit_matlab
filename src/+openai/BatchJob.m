@@ -71,7 +71,7 @@ classdef BatchJob < handle
             end
         
             obj.BatchInfo = batchInfo;
-        
+                                        
             if isfield(batchInfo,"status")
                 obj.update(Status=string(batchInfo.status));
             end

@@ -38,7 +38,7 @@ function pageTail = getPageTail(page)
 
     wordCounts = numel(chPos);
     startWordIdx = max(1,ceil(wordCounts/2));
-    startChIdx = chPos(startWordIdx);
+    startChIdx =  chPos(startWordIdx);
 
     pageTail = string(text(startChIdx:end));
 end
